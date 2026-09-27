@@ -7,6 +7,9 @@ obj/
 publish/
 Releases/
 
+# Scratch/notes
+update-plan.txt
+
 # Local app data files — settings.json contains the SteamGridDB API key, never commit these
 settings.json
 install-state.json
