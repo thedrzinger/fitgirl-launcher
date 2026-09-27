@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Windows.Data;
 using FitGirlLauncher.Models;
 using FitGirlLauncher.Services;
@@ -22,6 +23,10 @@ public class MainViewModel : ObservableObject
 
         GamesView = CollectionViewSource.GetDefaultView(Games);
         GamesView.Filter = FilterGame;
+        // Group tiles by library folder. WPF lays groups out in first-appearance
+        // order, and games are added in settings order — so sections follow the
+        // settings order, never an alphabetical re-sort.
+        GamesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(GameEntry.LibraryFolderName)));
 
         // Top nav. Add future pages here (e.g. new NavItem("about", "About", "?")).
         NavItems.Add(new NavItem("settings", "Settings", "⚙"));
@@ -32,8 +37,14 @@ public class MainViewModel : ObservableObject
         LocateExeCommand = new RelayCommand(p => LocateExe((GameEntry)p!));
         ClearExeCommand = new RelayCommand(p => ClearExe((GameEntry)p!));
 
-        // Silent background update check (see UpdateService for the full flow).
-        _ = UpdateService.Instance.CheckForUpdatesAsync();
+        // Startup update check: notify-only, never downloads. If a newer version
+        // exists, the dot in the nav bar lights up and the user installs it from
+        // Settings (see UpdateService for the full flow).
+        var updates = UpdateService.Instance;
+        updates.UpdateAvailable += (_, _) => HasUpdateAvailable = true;
+        updates.UpdateReady += (_, _) => HasUpdateAvailable = true;
+        HasUpdateAvailable = updates.HasPendingUpdate; // a download from a previous session is still waiting
+        _ = updates.CheckOnlyAsync();
         _ = RefreshAsync();
     }
 
@@ -47,6 +58,16 @@ public class MainViewModel : ObservableObject
     public RelayCommand OpenGameCommand { get; }
     public RelayCommand LocateExeCommand { get; }
     public RelayCommand ClearExeCommand { get; }
+
+    private bool _hasUpdateAvailable;
+    /// <summary>True when the startup check found a newer version (not yet downloaded)
+    /// or an update is already downloaded and waiting for a restart. Shows the dot
+    /// in the nav bar; clicking it opens Settings.</summary>
+    public bool HasUpdateAvailable
+    {
+        get => _hasUpdateAvailable;
+        private set => SetProperty(ref _hasUpdateAvailable, value);
+    }
 
     private bool _isScanning;
     public bool IsScanning
@@ -155,27 +176,61 @@ public class MainViewModel : ObservableObject
         StatusMessage = "";
         try
         {
-            var path = Settings.LibraryPath.Trim();
-            if (string.IsNullOrEmpty(path))
+            // One scan pass per configured library folder, in settings order.
+            var paths = Settings.LibraryFolders
+                .Select(r => r.Path.Trim())
+                .Where(p => !string.IsNullOrEmpty(p))
+                .ToList();
+
+            if (paths.Count == 0)
             {
                 Games.Clear();
                 Status = LibraryStatus.NotSet;
-                StatusText = "No library folder set yet — open Settings to point at your games.";
+                StatusText = "No library folders set yet — open Settings to point at your games.";
                 return;
             }
 
-            var result = await Task.Run(() => LibraryScanner.Scan(path));
+            var scanned = new List<GameEntry>();
+            var errors = new List<string>();
+
+            foreach (var path in paths)
+            {
+                var result = await Task.Run(() => LibraryScanner.Scan(path));
+                if (result.Error != null)
+                {
+                    errors.Add(result.Error);
+                    continue;
+                }
+                // The folder's own name (last path segment) becomes the section
+                // header for its games on the main page.
+                var folderName = Path.GetFileName(
+                    path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (string.IsNullOrEmpty(folderName))
+                    folderName = path;
+                foreach (var game in result.Games)
+                    game.LibraryFolderName = folderName;
+                scanned.AddRange(result.Games);
+            }
 
             Games.Clear();
-            if (result.Error != null)
+
+            if (scanned.Count == 0)
             {
-                Status = LibraryStatus.Unreachable;
-                StatusMessage = result.Error;
-                StatusText = "Library unreachable.";
+                if (errors.Count == paths.Count)
+                {
+                    Status = LibraryStatus.Unreachable;
+                    StatusMessage = string.Join(Environment.NewLine, errors);
+                    StatusText = "Library unreachable.";
+                }
+                else
+                {
+                    Status = LibraryStatus.Empty;
+                    StatusText = "No [FitGirl Repack] folders found in your library folders.";
+                }
                 return;
             }
 
-            foreach (var game in result.Games)
+            foreach (var game in scanned)
             {
                 var installedExe = _installState.GetExePath(game.FolderName);
                 if (!string.IsNullOrEmpty(installedExe))
@@ -196,15 +251,10 @@ public class MainViewModel : ObservableObject
                 Games.Add(game);
             }
 
-            if (Games.Count == 0)
-            {
-                Status = LibraryStatus.Empty;
-                StatusText = "No [FitGirl Repack] folders found in this folder.";
-                return;
-            }
-
             Status = LibraryStatus.Ready;
-            StatusText = $"{Games.Count} game{(Games.Count == 1 ? "" : "s")} — {path}";
+            StatusText = errors.Count > 0
+                ? $"{Games.Count} game{(Games.Count == 1 ? "" : "s")} — {paths.Count} library folder{(paths.Count == 1 ? "" : "s")} ({errors.Count} unreachable)"
+                : $"{Games.Count} game{(Games.Count == 1 ? "" : "s")} — {paths.Count} library folder{(paths.Count == 1 ? "" : "s")}";
 
             // Keep the art cache in step with the library: drop covers for games that
             // are gone. Only when the scan found games — a network drive can briefly

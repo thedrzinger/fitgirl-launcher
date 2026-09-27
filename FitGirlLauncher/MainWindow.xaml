@@ -32,6 +32,15 @@
                     <TextBlock Text="FitGirl Launcher" FontSize="16" FontWeight="SemiBold"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
+                <!-- Update indicator: the startup check found a newer version. Click
+                     to open Settings, where the user downloads it and restarts. -->
+                <Button DockPanel.Dock="Right" Width="26" Height="26" Padding="0"
+                        Background="Transparent" BorderThickness="0" Margin="0,0,10,0"
+                        ToolTip="A new version is available — click to install it"
+                        Visibility="{Binding HasUpdateAvailable, Converter={StaticResource BoolToVis}}"
+                        Command="{Binding OpenSettingsCommand}">
+                    <Ellipse Width="10" Height="10" Fill="{StaticResource AccentBrush}"/>
+                </Button>
                 <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding NavItems}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

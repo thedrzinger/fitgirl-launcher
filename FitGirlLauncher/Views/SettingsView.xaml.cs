@@ -14,8 +14,11 @@ public partial class SettingsView : UserControl
 
     private void BrowseFolder_Click(object sender, RoutedEventArgs e)
     {
-        var folder = UiDialogs.ChooseFolder("Choose your game library folder");
-        if (folder != null && DataContext is MainViewModel vm)
-            vm.Settings.LibraryPath = folder;
+        if (sender is not Button { DataContext: LibraryPathRow row })
+            return;
+
+        var folder = UiDialogs.ChooseFolder("Choose a game library folder");
+        if (folder != null)
+            row.Path = folder;
     }
 }

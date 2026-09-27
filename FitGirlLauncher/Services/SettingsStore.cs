@@ -3,10 +3,15 @@ using System.Text.Json;
 
 namespace FitGirlLauncher.Services;
 
-/// <summary>Persisted app settings (library path, API key, update repo URL).</summary>
+/// <summary>Persisted app settings (library folders, API key, update repo URL).</summary>
 public class AppSettings
 {
-    public string LibraryPath { get; set; } = "";
+    /// <summary>
+    /// Game library folders, each holding individual game folders.
+    /// Older versions stored a single <c>LibraryPath</c> string — Load() seeds
+    /// this list from that value so existing installs keep their folder.
+    /// </summary>
+    public List<string> LibraryPaths { get; set; } = new();
     public string SteamGridDbApiKey { get; set; } = "";
 
     /// <summary>
@@ -48,7 +53,22 @@ public static class SettingsStore
             if (File.Exists(SettingsFilePath))
             {
                 var json = File.ReadAllText(SettingsFilePath);
-                return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+                var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+
+                // One-time migration: pre-multi-folder installs saved a single
+                // "LibraryPath" string. If the new list came out empty but the old
+                // string is present, seed it so the user's configured folder
+                // survives the upgrade. The file is rewritten in the new format
+                // on the next save.
+                var legacy = JsonSerializer.Deserialize<LegacySettings>(json, JsonOptions);
+                if (legacy is not null
+                    && settings.LibraryPaths is { Count: 0 }
+                    && !string.IsNullOrWhiteSpace(legacy.LibraryPath))
+                {
+                    settings.LibraryPaths = new List<string> { legacy.LibraryPath };
+                }
+
+                return settings;
             }
         }
         catch
@@ -56,6 +76,12 @@ public static class SettingsStore
             // Corrupt or unreadable settings file — fall back to defaults.
         }
         return new AppSettings();
+    }
+
+    /// <summary>Probe for the old single-folder "LibraryPath" key — migration only.</summary>
+    private sealed class LegacySettings
+    {
+        public string? LibraryPath { get; set; }
     }
 
     public static void Save(AppSettings settings)

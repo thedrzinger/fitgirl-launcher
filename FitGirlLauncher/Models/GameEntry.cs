@@ -20,6 +20,13 @@ public class GameEntry : ObservableObject
     /// <summary>Title cleaned from folder cruft, used for display and art lookup.</summary>
     public string CleanTitle { get; }
 
+    /// <summary>
+    /// Name of the library folder (last path segment) this game was found in.
+    /// Set right after scanning; used to group the library view into
+    /// per-folder sections.
+    /// </summary>
+    public string LibraryFolderName { get; set; } = "Library";
+
     private ImageSource? _artImage;
     public ImageSource? ArtImage
     {

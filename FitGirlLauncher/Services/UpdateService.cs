@@ -6,9 +6,10 @@ using Velopack.Sources;
 namespace FitGirlLauncher.Services;
 
 /// <summary>
-/// Self-updating via Velopack: checks the app's GitHub releases, downloads
-/// anything newer in the background, and swaps in the new version when the
-/// user restarts.
+/// Self-updating via Velopack. The startup check is notify-only: it reports a
+/// newer version (UpdateAvailable) but never downloads. Downloads happen only
+/// when the user clicks "Check for updates" in Settings (UpdateReady). The new
+/// version swaps in when the user restarts.
 ///
 /// Everything here is designed to fail silently — an update problem must never
 /// take down the launcher. Failures are written to
@@ -22,6 +23,9 @@ public sealed class UpdateService
     private readonly object _gate = new();
     private UpdateInfo? _pending;
     private bool _busy;
+
+    /// <summary>Raised when a check finds a newer version. Args: (currentVersion, newVersion).</summary>
+    public event Action<string, string>? UpdateAvailable;
 
     /// <summary>Raised after a new version has been downloaded. Args: (currentVersion, newVersion).</summary>
     public event Action<string, string>? UpdateReady;
@@ -55,10 +59,50 @@ public sealed class UpdateService
     }
 
     /// <summary>
-    /// Checks GitHub for a newer release. If one exists, downloads it and raises
-    /// <see cref="UpdateReady"/>. Never throws — always returns a user-facing message.
+    /// Checks GitHub for a newer release without downloading anything. Raises
+    /// <see cref="UpdateAvailable"/> when one exists. Never throws.
     /// </summary>
-    public async Task<string> CheckForUpdatesAsync()
+    public async Task<bool> CheckOnlyAsync()
+    {
+        lock (_gate)
+        {
+            if (_busy)
+                return false;
+            _busy = true;
+        }
+
+        try
+        {
+            var newVersion = await _manager.CheckForUpdatesAsync();
+            if (newVersion == null)
+            {
+                Log($"Check: no update available (current {CurrentVersion}).");
+                return false;
+            }
+
+            var newVersionString = newVersion.TargetFullRelease.Version.ToString();
+            Log($"Check: update {newVersionString} available (current {CurrentVersion}) — not downloading; install it from Settings.");
+            UpdateAvailable?.Invoke(CurrentVersion, newVersionString);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"Update check failed: {ex}");
+            return false;
+        }
+        finally
+        {
+            lock (_gate)
+                _busy = false;
+        }
+    }
+
+    /// <summary>
+    /// Checks GitHub for a newer release and, if one exists, downloads it and
+    /// raises <see cref="UpdateReady"/>. Never throws — always returns a
+    /// user-facing message.
+    /// </summary>
+    public async Task<string> CheckAndDownloadAsync()
     {
         lock (_gate)
         {
@@ -71,7 +115,10 @@ public sealed class UpdateService
         {
             var newVersion = await _manager.CheckForUpdatesAsync();
             if (newVersion == null)
+            {
+                Log($"Manual check: no update available (current {CurrentVersion}).");
                 return $"You're on the latest version ({CurrentVersion}).";
+            }
 
             var newVersionString = newVersion.TargetFullRelease.Version.ToString();
             lock (_gate)
@@ -81,7 +128,9 @@ public sealed class UpdateService
                 _pending = newVersion;
             }
 
+            Log($"Manual check: downloading {newVersionString}…");
             await _manager.DownloadUpdatesAsync(newVersion, null, CancellationToken.None);
+            Log($"Manual check: {newVersionString} downloaded, ready to install.");
             UpdateReady?.Invoke(CurrentVersion, newVersionString);
             return $"Version {newVersionString} is available (you're on {CurrentVersion}) — downloaded, ready to install.";
         }

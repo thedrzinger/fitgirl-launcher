@@ -15,13 +15,28 @@
                     <TextBlock Text="Game library" FontSize="15" FontWeight="SemiBold"/>
                     <TextBlock Margin="0,6,0,12" TextWrapping="Wrap" FontSize="12"
                                Foreground="{StaticResource SubTextBrush}"
-                               Text="The folder that contains your individual game folders — the ones with [FitGirl Repack] in the name."/>
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Browse…"
-                                MinWidth="96" Margin="10,0,0,0"
-                                Click="BrowseFolder_Click"/>
-                        <TextBox Text="{Binding Settings.LibraryPath, UpdateSourceTrigger=PropertyChanged}"/>
-                    </DockPanel>
+                               Text="The folders that contain your individual game folders — the ones with [FitGirl Repack] in the name. Each one becomes a section on the main page."/>
+                    <ItemsControl ItemsSource="{Binding Settings.LibraryFolders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,0,0,8" LastChildFill="True">
+                                    <Button DockPanel.Dock="Right" Content="Browse…"
+                                            MinWidth="96" Margin="10,0,0,0"
+                                            Click="BrowseFolder_Click"/>
+                                    <Button DockPanel.Dock="Right" Content="×"
+                                            Width="30" Padding="0" Margin="0"
+                                            FontSize="13"
+                                            ToolTip="Remove this folder"
+                                            Command="{Binding RemoveCommand}"
+                                            Visibility="{Binding RemoveButtonVisibility}"/>
+                                    <TextBox Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="+ Add another folder" HorizontalAlignment="Left"
+                            MinWidth="150"
+                            Command="{Binding Settings.AddFolderCommand}"/>
                 </StackPanel>
             </Border>
 
@@ -51,7 +66,7 @@
                     </StackPanel>
                     <TextBlock Margin="0,6,0,12" TextWrapping="Wrap" FontSize="12"
                                Foreground="{StaticResource SubTextBrush}"
-                               Text="Checked automatically on startup, and whenever you click below. If a new version is found it's downloaded in the background and a small notification appears in the corner."/>
+                                Text="Checked automatically on startup, but nothing is ever downloaded behind your back. If a new version exists, a dot appears in the nav bar — use the button below to download it, then restart to install."/>
                     <TextBlock Margin="0,0,0,12" TextWrapping="Wrap" FontSize="12"
                                Foreground="{StaticResource SubTextBrush}"
                                Text="{Binding Settings.UpdateStatus}"/>

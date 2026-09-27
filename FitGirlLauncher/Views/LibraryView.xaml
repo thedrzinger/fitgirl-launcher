@@ -52,6 +52,26 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           Visibility="{Binding Status, Converter={StaticResource StatusToVis}, ConverterParameter=Ready}">
                 <ItemsControl x:Name="GamesItems" ItemsSource="{Binding GamesView}" Margin="16">
+                    <!-- Sections stack vertically (GroupStyle.Panel hosts the groups);
+                         tiles wrap inside each section (the ItemsPanel is what
+                         WPF uses for the items within each group).
+                         Group order = first-appearance order = settings order. -->
+                    <ItemsControl.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="16" FontWeight="SemiBold"
+                                               Margin="0,12,0,2"/>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                            <GroupStyle.Panel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel/>
+                                </ItemsPanelTemplate>
+                            </GroupStyle.Panel>
+                        </GroupStyle>
+                    </ItemsControl.GroupStyle>
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -143,7 +163,7 @@
                            FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                 <TextBlock Margin="0,10,0,22" TextWrapping="Wrap" HorizontalAlignment="Center"
                            Foreground="{StaticResource SubTextBrush}"
-                           Text="Point the launcher at the folder that holds your game folders (the ones with [FitGirl Repack] in the name) and your library will appear here."/>
+                           Text="Point the launcher at the folders that hold your game folders (the ones with [FitGirl Repack] in the name) and your library will appear here."/>
                 <Button Content="Open Settings" Style="{StaticResource PrimaryButton}"
                         Padding="18,9" HorizontalAlignment="Center"
                         Command="{Binding OpenSettingsCommand}"/>
@@ -171,7 +191,7 @@
                            FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                 <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" HorizontalAlignment="Center"
                            Foreground="{StaticResource SubTextBrush}"
-                           Text="No folders with [FitGirl Repack] in the name were found in this folder."/>
+                           Text="No folders with [FitGirl Repack] in the name were found in any of your library folders."/>
             </StackPanel>
         </Grid>
     </Grid>

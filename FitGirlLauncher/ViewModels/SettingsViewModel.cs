@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using FitGirlLauncher.Models;
 using FitGirlLauncher.Services;
@@ -9,19 +10,38 @@ public class SettingsViewModel : ObservableObject
 {
     private readonly AppSettings _store;
 
-    private string _libraryPath;
     private string _apiKey;
     private string _updateStatus = "Not checked yet.";
     private bool _checkingUpdates;
     private bool _hasPendingUpdate;
 
+    /// <summary>Library folders for the Settings page, one row each. Always holds at least one row.</summary>
+    public ObservableCollection<LibraryPathRow> LibraryFolders { get; } = new();
+
     public SettingsViewModel(AppSettings store)
     {
         _store = store;
-        _libraryPath = store.LibraryPath;
         _apiKey = store.SteamGridDbApiKey;
         _hasPendingUpdate = UpdateService.Instance.HasPendingUpdate;
+
+        // Seed one row per saved folder; if none are saved, start with one empty
+        // row so there's always something to type into / browse.
+        var saved = store.LibraryPaths ?? new List<string>();
+        if (saved.Count == 0)
+            LibraryFolders.Add(new LibraryPathRow(LibraryFolders));
+        else
+            foreach (var path in saved)
+                LibraryFolders.Add(new LibraryPathRow(LibraryFolders) { Path = path });
+
+        LibraryFolders.CollectionChanged += (_, _) => SyncRemoveButtons();
+        SyncRemoveButtons(); // rows seeded above predate the subscription
+
         SaveCommand = new RelayCommand(_ => Save());
+        AddFolderCommand = new RelayCommand(_ =>
+        {
+            LibraryFolders.Add(new LibraryPathRow(LibraryFolders));
+            SyncRemoveButtons();
+        });
         RestartToUpdateCommand = new RelayCommand(_ =>
         {
             if (!UpdateService.Instance.ApplyPendingUpdate())
@@ -35,7 +55,7 @@ public class SettingsViewModel : ObservableObject
             UpdateStatus = "Checking for updates…";
             try
             {
-                UpdateStatus = await UpdateService.Instance.CheckForUpdatesAsync();
+                UpdateStatus = await UpdateService.Instance.CheckAndDownloadAsync();
             }
             finally
             {
@@ -45,12 +65,6 @@ public class SettingsViewModel : ObservableObject
 
         // Keep the "Restart to update" button in sync when a background check lands.
         UpdateService.Instance.UpdateReady += (_, _) => HasPendingUpdate = true;
-    }
-
-    public string LibraryPath
-    {
-        get => _libraryPath;
-        set => SetProperty(ref _libraryPath, value);
     }
 
     public string ApiKey
@@ -96,6 +110,8 @@ public class SettingsViewModel : ObservableObject
 
     public RelayCommand SaveCommand { get; }
 
+    public RelayCommand AddFolderCommand { get; }
+
     public RelayCommand CheckUpdatesCommand { get; }
 
     public RelayCommand RestartToUpdateCommand { get; }
@@ -103,9 +119,22 @@ public class SettingsViewModel : ObservableObject
     /// <summary>Raised after a successful save — main VM uses it to rescan.</summary>
     public event Action? Saved;
 
+    /// <summary>Hides the "×" on the first row so at least one row always remains.</summary>
+    private void SyncRemoveButtons()
+    {
+        for (var i = 0; i < LibraryFolders.Count; i++)
+            LibraryFolders[i].IsFirstRow = i == 0;
+    }
+
     private void Save()
     {
-        _store.LibraryPath = LibraryPath.Trim();
+        // Trim each row, drop blanks (an "Add folder" row that was never filled in),
+        // and de-duplicate so the same folder isn't scanned twice.
+        _store.LibraryPaths = LibraryFolders
+            .Select(r => r.Path.Trim())
+            .Where(p => !string.IsNullOrEmpty(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         _store.SteamGridDbApiKey = ApiKey.Trim();
         SettingsStore.Save(_store);
         Saved?.Invoke();

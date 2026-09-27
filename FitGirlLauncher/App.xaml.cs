@@ -34,11 +34,6 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) => LogCrash("UI thread", args.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, args) => LogCrash("AppDomain", args.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, args) => LogCrash("unobserved task", args.Exception);
-
-        // Self-update: once a new version has been downloaded, drop a small
-        // toast in the corner. Its "Restart to update" button performs the swap.
-        UpdateService.Instance.UpdateReady += (current, next) =>
-            new Views.UpdateToastWindow(current, next).Show();
     }
 
     private static void LogCrash(string source, Exception? ex)
