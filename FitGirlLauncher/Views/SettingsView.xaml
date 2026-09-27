@@ -1,0 +1,75 @@
+<UserControl x:Class="FitGirlLauncher.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="640" HorizontalAlignment="Center" Margin="24,28">
+            <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SubTextBrush}"
+                       Text="Saved to a local file on this PC — nothing leaves your machine."/>
+
+            <!-- Library folder -->
+            <Border Margin="0,22,0,0" Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <TextBlock Text="Game library" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock Margin="0,6,0,12" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource SubTextBrush}"
+                               Text="The folder that contains your individual game folders — the ones with [FitGirl Repack] in the name."/>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Browse…"
+                                MinWidth="96" Margin="10,0,0,0"
+                                Click="BrowseFolder_Click"/>
+                        <TextBox Text="{Binding Settings.LibraryPath, UpdateSourceTrigger=PropertyChanged}"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Cover art key -->
+            <Border Margin="0,14,0,0" Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <TextBlock Text="Cover art (SteamGridDB)" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock Margin="0,6,0,12" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource SubTextBrush}"
+                               Text="API key used to fetch cover art. Generate one at steamgriddb.com under Profile → Preferences."/>
+                    <TextBox Text="{Binding Settings.ApiKey, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Updates -->
+            <Border Margin="0,14,0,0" Background="{StaticResource CardBrush}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="10" Padding="18">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Updates" FontSize="15" FontWeight="SemiBold"/>
+                        <TextBlock Margin="10,0,0,0" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   Text="{Binding Settings.CurrentVersion, StringFormat=Version {0}}"/>
+                    </StackPanel>
+                    <TextBlock Margin="0,6,0,12" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource SubTextBrush}"
+                               Text="Checked automatically on startup, and whenever you click below. If a new version is found it's downloaded in the background and a small notification appears in the corner."/>
+                    <TextBlock Margin="0,0,0,12" TextWrapping="Wrap" FontSize="12"
+                               Foreground="{StaticResource SubTextBrush}"
+                               Text="{Binding Settings.UpdateStatus}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="{Binding Settings.UpdateButtonText}"
+                                MinWidth="150" Padding="12,6"
+                                Command="{Binding Settings.CheckUpdatesCommand}"/>
+                        <Button Content="Restart to update" Style="{StaticResource PrimaryButton}"
+                                MinWidth="130" Margin="10,0,0,0" Padding="12,6"
+                                Visibility="{Binding Settings.RestartButtonVisibility}"
+                                Command="{Binding Settings.RestartToUpdateCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Button Content="Save &amp; rescan" Style="{StaticResource PrimaryButton}"
+                    Padding="20,9" Margin="0,24,0,0" HorizontalAlignment="Left" MinWidth="150"
+                    Command="{Binding Settings.SaveCommand}"/>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

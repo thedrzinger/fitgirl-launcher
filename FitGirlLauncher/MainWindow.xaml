@@ -1,0 +1,77 @@
+﻿<Window x:Class="FitGirlLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:FitGirlLauncher.Views"
+        xmlns:conv="clr-namespace:FitGirlLauncher.Converters"
+        Title="FitGirl Launcher" Height="720" Width="1120"
+        MinHeight="560" MinWidth="860"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBoolToVisibilityConverter x:Key="InvBoolToVis"/>
+        <conv:NotNullToVisibilityConverter x:Key="NotNullToVis"/>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top navigation bar -->
+        <Border Grid.Row="0" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <DockPanel Margin="16,10">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Border Background="{StaticResource AccentBrush}" CornerRadius="8"
+                            Width="34" Height="34">
+                        <TextBlock Text="FG" FontWeight="Bold" Foreground="White" FontSize="14"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="FitGirl Launcher" FontSize="16" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
+                <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding NavItems}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <ToggleButton Style="{StaticResource NavButton}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Click="NavButton_Click" Tag="{Binding}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" Margin="0,0,7,0"/>
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ToggleButton>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+        </Border>
+
+        <!-- Content: library, settings, and the game detail page share the area -->
+        <Grid Grid.Row="1">
+            <views:LibraryView
+                Visibility="{Binding IsLibraryVisible, Converter={StaticResource BoolToVis}}"/>
+            <views:SettingsView x:Name="SettingsPane"
+                                Visibility="{Binding IsSettingsOpen, Converter={StaticResource BoolToVis}}"/>
+            <!-- Visibility lives on a wrapper (DataContext stays MainViewModel) so the
+                 binding can't be detached when the inner DataContext goes null on back-nav. -->
+            <Grid Visibility="{Binding IsDetailVisible, Converter={StaticResource BoolToVis}}">
+                <views:GameDetailView DataContext="{Binding SelectedGameDetail}"/>
+            </Grid>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusText}" Margin="16,7" FontSize="12"
+                       Foreground="{StaticResource SubTextBrush}"/>
+        </Border>
+    </Grid>
+</Window>

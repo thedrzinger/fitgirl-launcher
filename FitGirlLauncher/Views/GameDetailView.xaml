@@ -1,0 +1,158 @@
+<UserControl x:Class="FitGirlLauncher.Views.GameDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:FitGirlLauncher.Converters">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBoolConverter x:Key="InvBool"/>
+        <conv:InverseBoolToVisibilityConverter x:Key="InvBoolToVis"/>
+        <conv:NonEmptyStringToVisibilityConverter x:Key="NonEmptyStrToVis"/>
+        <conv:NullToVisibilityConverter x:Key="NullToVis"/>
+        <conv:NotNullToVisibilityConverter x:Key="NotNullToVis"/>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top bar: back / title / refresh / launch -->
+        <Border Grid.Row="0" Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <DockPanel Margin="16,10">
+                <Button DockPanel.Dock="Left" Content="←  Library" Padding="12,6"
+                        Command="{Binding BackCommand}"/>
+                <Button DockPanel.Dock="Right" Content="{Binding LaunchText}"
+                        Style="{StaticResource PrimaryButton}" MinWidth="130" Padding="16,7"
+                        Command="{Binding LaunchCommand}"
+                        ToolTip="Runs the game's setup.exe — or the installed game if you've located it"/>
+                <Button DockPanel.Dock="Right" Content="Refresh Steam details"
+                        Padding="12,6" Margin="0,0,10,0"
+                        Command="{Binding RefreshCommand}"
+                        IsEnabled="{Binding IsLoading, Converter={StaticResource InvBool}}"
+                        ToolTip="Force a fresh lookup from Steam (otherwise details are fetched once and cached)"/>
+                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding Title}"/>
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,22">
+
+                <!-- Header: cover + title + steam match -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0" Width="220" Height="308">
+                        <Border CornerRadius="10" ClipToBounds="True"
+                                Background="{StaticResource CardBrush}">
+                            <Image Source="{Binding Game.ArtImage}"
+                                   Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Visibility="{Binding Game.HasArt, Converter={StaticResource BoolToVis}}"/>
+                        </Border>
+                        <Border Background="{StaticResource CardBrush}" CornerRadius="10"
+                                Visibility="{Binding Game.HasArt, Converter={StaticResource InvBoolToVis}}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="❖" FontSize="30" HorizontalAlignment="Center"
+                                           Foreground="{StaticResource SubTextBrush}"/>
+                                <TextBlock Text="No cover found" Margin="0,8,0,0" FontSize="12"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{StaticResource SubTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+                        <!-- Shown only while the cover is actually loading (same rule as the library
+                             tile). The old binding used HasArt, which left the spinner up forever
+                             for games whose lookup had already failed. -->
+                        <Control Style="{StaticResource ArtSpinner}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                                 Visibility="{Binding ArtLoading, Converter={StaticResource BoolToVis}}"/>
+                    </Grid>
+                    <StackPanel Grid.Column="1" Margin="26,4,0,0">
+                        <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding StoreLine}" Margin="0,8,0,0" FontSize="13"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap"
+                                   Visibility="{Binding StoreLine, Converter={StaticResource NonEmptyStrToVis}}"/>
+                        <TextBlock Text="{Binding FetchedLine}" Margin="0,4,0,0" FontSize="11"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   Visibility="{Binding FetchedLine, Converter={StaticResource NonEmptyStrToVis}}"/>
+                        <TextBlock Text="{Binding Game.Description}" Margin="0,14,0,0"
+                                   FontSize="14" LineHeight="21" TextWrapping="Wrap"
+                                   Visibility="{Binding Game.Description, Converter={StaticResource NonEmptyStrToVis}}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Fetching from Steam -->
+                <StackPanel Orientation="Horizontal" Margin="0,26,0,0"
+                            Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                    <Control Style="{StaticResource ArtSpinner}" VerticalAlignment="Center"/>
+                    <TextBlock Text="Fetching Steam details…" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Foreground="{StaticResource SubTextBrush}"/>
+                </StackPanel>
+
+                <!-- No Steam listing -->
+                <Border Margin="0,26,0,0" Background="{StaticResource CardBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18"
+                        Visibility="{Binding ShowNotFound, Converter={StaticResource BoolToVis}}">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="No Steam listing found for this game — so there's no description or screenshots to show. If you think it should be on Steam, hit “Refresh Steam details” above to check again."/>
+                </Border>
+
+                <!-- Lookup failed -->
+                <Border Margin="0,26,0,0" Background="{StaticResource CardBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18"
+                        Visibility="{Binding ShowFailed, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="Couldn't reach Steam" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding FailMessage}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{StaticResource SubTextBrush}"/>
+                        <TextBlock Margin="0,10,0,0" Foreground="{StaticResource SubTextBrush}"
+                                   Text="Hit “Refresh Steam details” to try again."/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Screenshots -->
+                <StackPanel Visibility="{Binding HasScreenshots, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Screenshots" Margin="0,28,0,12"
+                               FontSize="16" FontWeight="SemiBold"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                  MaxHeight="210">
+                        <ItemsControl ItemsSource="{Binding Screenshots}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Margin="0,0,12,0" Padding="0"
+                                            BorderThickness="0" Background="Transparent"
+                                            ToolTip="Click to view full size"
+                                            Command="{Binding DataContext.OpenScreenshotCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Grid Width="320" Height="180" Background="{StaticResource CardBrush}">
+                                            <Image Source="{Binding Thumb}"
+                                                   Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Visibility="{Binding Thumb, Converter={StaticResource NotNullToVis}}"/>
+                                            <ProgressBar IsIndeterminate="True"
+                                                         Width="48" Height="4"
+                                                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                         Visibility="{Binding Thumb, Converter={StaticResource NullToVis}}"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,13 @@
+# .NET
+bin/
+obj/
+*.user
+
+# Build output & packed installers
+publish/
+Releases/
+
+# Local app data files — settings.json contains the SteamGridDB API key, never commit these
+settings.json
+install-state.json
+art-cache/
