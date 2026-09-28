@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <!-- Velopack uses this as the running app version (shown in Settings,
          compared against the GitHub releases). Bump it for each release. -->
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <!-- We define our own Main() in App.xaml.cs so VelopackApp.Build().Run()
          can execute before WPF starts. -->
     <StartupObject>FitGirlLauncher.App</StartupObject>
