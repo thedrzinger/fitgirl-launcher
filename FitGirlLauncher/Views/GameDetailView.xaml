@@ -25,12 +25,16 @@
                 <Button DockPanel.Dock="Right" Content="{Binding LaunchText}"
                         Style="{StaticResource PrimaryButton}" MinWidth="130" Padding="16,7"
                         Command="{Binding LaunchCommand}"
-                        ToolTip="Runs the game's setup.exe — or the installed game if you've located it"/>
+                        ToolTip="Runs the game's setup.exe"/>
                 <Button DockPanel.Dock="Right" Content="Refresh Steam details"
                         Padding="12,6" Margin="0,0,10,0"
                         Command="{Binding RefreshCommand}"
                         IsEnabled="{Binding IsLoading, Converter={StaticResource InvBool}}"
                         ToolTip="Force a fresh lookup from Steam (otherwise details are fetched once and cached)"/>
+                <Button DockPanel.Dock="Right" Content="Fix Steam match…"
+                        Padding="12,6" Margin="0,0,10,0"
+                        Command="{Binding FixSteamMatchCommand}"
+                        ToolTip="Pick the right Steam listing by hand when the automatic match is wrong"/>
                 <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding Title}"/>

@@ -98,6 +98,33 @@ public class SteamStoreClient
     }
 
     /// <summary>
+    /// Up to <paramref name="max"/> store-search hits for a term — the full "items" array,
+    /// not just the first. For the manual "Fix Steam match" picker, where the user picks
+    /// from the candidates. Empty list when Steam has no results.
+    /// </summary>
+    public async Task<List<SteamSearchHit>> SearchMultipleAsync(string term, int max = 8)
+    {
+        var path = $"/api/storesearch/?term={Uri.EscapeDataString(term)}&l=english&cc=us";
+        using var response = await SendWithBackoffAsync(path);
+        using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+
+        var hits = new List<SteamSearchHit>();
+        if (doc.RootElement.TryGetProperty("items", out var items) &&
+            items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                if (hits.Count >= max)
+                    break;
+                hits.Add(new SteamSearchHit(
+                    item.GetProperty("id").GetInt32(),
+                    item.TryGetProperty("name", out var name) ? name.GetString() ?? "" : ""));
+            }
+        }
+        return hits;
+    }
+
+    /// <summary>
     /// Fetches store details for an App ID. Null when Steam says success=false (e.g. delisted).
     /// CAUTION: the top-level JSON key is NOT the requested appid — Steam keys the response
     /// by an internal ID (e.g. asked 3293260, key was 4811290). Read the first property.

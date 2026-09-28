@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows.Media;
 
 namespace FitGirlLauncher.Models;
@@ -12,10 +13,34 @@ public class GameEntry : ObservableObject
         CleanTitle = cleanTitle;
     }
 
-    /// <summary>Original folder name — the stable key for install state.</summary>
+    /// <summary>Original folder name — the stable key for persisted per-game data.</summary>
     public string FolderName { get; }
 
     public string FolderPath { get; }
+
+    private DateTime? _folderCreatedUtc;
+    /// <summary>Folder creation time (UTC) — the "recently added" proxy for the
+    /// library sort. One filesystem call per game, then cached; if the folder is
+    /// unreachable at sort time it sorts as oldest rather than breaking the view.</summary>
+    public DateTime FolderCreatedUtc
+    {
+        get
+        {
+            if (_folderCreatedUtc is not { } created)
+            {
+                try
+                {
+                    created = Directory.GetCreationTimeUtc(FolderPath);
+                }
+                catch
+                {
+                    created = DateTime.MinValue;
+                }
+                _folderCreatedUtc = created;
+            }
+            return created;
+        }
+    }
 
     /// <summary>Title cleaned from folder cruft, used for display and art lookup.</summary>
     public string CleanTitle { get; }
@@ -26,6 +51,11 @@ public class GameEntry : ObservableObject
     /// per-folder sections.
     /// </summary>
     public string LibraryFolderName { get; set; } = "Library";
+
+    /// <summary>Position of this game's library folder in the settings order (0-based),
+    /// set during the scan. Lets the view re-sort tiles within a section without
+    /// reordering the sections themselves.</summary>
+    public int LibraryFolderIndex { get; set; }
 
     private ImageSource? _artImage;
     public ImageSource? ArtImage
@@ -39,24 +69,6 @@ public class GameEntry : ObservableObject
     }
 
     public bool HasArt => _artImage != null;
-
-    private bool _isInstalled;
-    public bool IsInstalled
-    {
-        get => _isInstalled;
-        set => SetProperty(ref _isInstalled, value);
-    }
-
-    private string? _installedExePath;
-    public string? InstalledExePath
-    {
-        get => _installedExePath;
-        set
-        {
-            if (SetProperty(ref _installedExePath, value))
-                IsInstalled = !string.IsNullOrEmpty(value);
-        }
-    }
 
     private bool _artResolved;
     /// <summary>True once art was found+cached, or definitively not found (so we don't re-query).</summary>

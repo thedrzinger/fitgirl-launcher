@@ -26,16 +26,34 @@
                 <TextBlock DockPanel.Dock="Right" Text="{Binding GameCountText}"
                            VerticalAlignment="Center" Margin="14,0,6,0"
                            Foreground="{StaticResource SubTextBrush}"/>
-                <Grid MinWidth="200" MaxWidth="420" Margin="12,0">
-                    <TextBox x:Name="SearchBox"
-                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock Text="Search games"
-                               IsHitTestVisible="False"
-                               VerticalAlignment="Center"
-                               Margin="11,0,0,0"
-                               Foreground="{StaticResource SubTextBrush}"
-                               Visibility="{Binding SearchText, Converter={StaticResource EmptyStrToVis}}"/>
-                </Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Grid MinWidth="200" MaxWidth="420" Margin="12,0">
+                        <TextBox x:Name="SearchBox"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Text="Search games"
+                                   IsHitTestVisible="False"
+                                   VerticalAlignment="Center"
+                                   Margin="11,0,0,0"
+                                   Foreground="{StaticResource SubTextBrush}"
+                                   Visibility="{Binding SearchText, Converter={StaticResource EmptyStrToVis}}"/>
+                    </Grid>
+                    <ComboBox Width="150" Margin="8,0,0,0" VerticalAlignment="Center"
+                              Foreground="Black"
+                              SelectedValue="{Binding SortMode}"
+                              SelectedValuePath="Tag"
+                              ToolTip="Sort the games">
+                        <!-- Item text is an explicit TextBlock with a LOCAL Foreground. The
+                             app-wide implicit TextBlock style (near-white) applies to the
+                             ContentPresenter's internally generated text and beats inherited
+                             values; only a local value on the TextBlock itself wins. -->
+                        <ComboBoxItem Tag="az">
+                            <TextBlock Text="A–Z" Foreground="Black"/>
+                        </ComboBoxItem>
+                        <ComboBoxItem Tag="recent">
+                            <TextBlock Text="Recently added" Foreground="Black"/>
+                        </ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
             </DockPanel>
         </Border>
 
@@ -79,11 +97,26 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
+                            <!-- Left click navigates straight to the detail page;
+                                 the ContextMenu below is right-click only (WPF default). -->
                             <Button Style="{StaticResource TileButton}"
                                     Width="176" Margin="8"
                                     ToolTip="{Binding FolderName}"
                                     Command="{Binding DataContext.OpenGameCommand, Source={x:Reference GamesItems}}"
                                     CommandParameter="{Binding}">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Open"
+                                                  Command="{Binding DataContext.OpenGameCommand, Source={x:Reference GamesItems}}"
+                                                  CommandParameter="{Binding}"/>
+                                        <MenuItem Header="Open containing folder"
+                                                  Command="{Binding DataContext.OpenFolderCommand, Source={x:Reference GamesItems}}"
+                                                  CommandParameter="{Binding}"/>
+                                        <MenuItem Header="Fix Steam match…"
+                                                  Command="{Binding DataContext.FixSteamMatchCommand, Source={x:Reference GamesItems}}"
+                                                  CommandParameter="{Binding}"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -110,25 +143,6 @@
                                                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
                                                  Visibility="{Binding ArtLoading, Converter={StaticResource BoolToVis}}"/>
 
-                                        <!-- installed badge -->
-                                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
-                                                Background="#CC17181D" CornerRadius="4" Padding="6,2"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <Ellipse Width="7" Height="7" VerticalAlignment="Center"
-                                                         Fill="{StaticResource SuccessBrush}"/>
-                                                <TextBlock Text="Installed" FontSize="11" Margin="5,0,0,0"
-                                                           Foreground="{StaticResource SuccessBrush}"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- locate installed exe -->
-                                        <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6"
-                                                Padding="8,3" FontSize="11"
-                                                Content="Locate exe"
-                                                ToolTip="Point at the installed game's .exe — its game page will then launch the game instead of the installer"
-                                                Command="{Binding DataContext.LocateExeCommand, Source={x:Reference GamesItems}}"
-                                                CommandParameter="{Binding}"/>
                                     </Grid>
                                     <TextBlock Grid.Row="1"
                                                Text="{Binding CleanTitle}"
@@ -138,18 +152,6 @@
                                                MaxHeight="34"
                                                TextTrimming="CharacterEllipsis"/>
                                 </Grid>
-
-                                <Button.ContextMenu>
-                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-                                        <MenuItem Header="Locate installed exe…"
-                                                  Command="{Binding DataContext.LocateExeCommand, Source={x:Reference GamesItems}}"
-                                                  CommandParameter="{Binding}"/>
-                                        <MenuItem Header="Clear installed exe"
-                                                  Command="{Binding DataContext.ClearExeCommand, Source={x:Reference GamesItems}}"
-                                                  CommandParameter="{Binding}"
-                                                  Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"/>
-                                    </ContextMenu>
-                                </Button.ContextMenu>
                             </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

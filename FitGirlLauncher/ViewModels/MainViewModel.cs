@@ -1,32 +1,42 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using System.Windows.Data;
 using FitGirlLauncher.Models;
 using FitGirlLauncher.Services;
+using FitGirlLauncher.Views;
 
 namespace FitGirlLauncher.ViewModels;
 
 public class MainViewModel : ObservableObject
 {
     private readonly ArtService _artService = new();
-    private readonly InstallStateStore _installState = new();
     private readonly SteamDetailStore _steamDetails = new();
     private readonly SteamDetailsService _steamService = new();
+    private readonly AppSettings _settings;
 
     public MainViewModel()
     {
-        var settings = SettingsStore.Load();
-        Settings = new SettingsViewModel(settings);
+        _settings = SettingsStore.Load();
+        Settings = new SettingsViewModel(_settings);
         Settings.Saved += OnSettingsSaved;
         _artService.ErrorReported += message => StatusText = message;
 
         GamesView = CollectionViewSource.GetDefaultView(Games);
         GamesView.Filter = FilterGame;
         // Group tiles by library folder. WPF lays groups out in first-appearance
-        // order, and games are added in settings order — so sections follow the
-        // settings order, never an alphabetical re-sort.
+        // order, and the LibraryFolderIndex sort (see ApplySort) is always the
+        // primary key — so sections follow the settings order no matter which
+        // tile sort is active.
         GamesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(GameEntry.LibraryFolderName)));
+
+        // Library sort mode, persisted in settings.json ("az" or "recent").
+        _sortMode = string.Equals(_settings.SortMode, "recent", StringComparison.OrdinalIgnoreCase)
+            ? "recent"
+            : "az";
+        ApplySort();
 
         // Top nav. Add future pages here (e.g. new NavItem("about", "About", "?")).
         NavItems.Add(new NavItem("settings", "Settings", "⚙"));
@@ -34,8 +44,8 @@ public class MainViewModel : ObservableObject
         RefreshCommand = new RelayCommand(_ => _ = RefreshAsync());
         OpenSettingsCommand = new RelayCommand(_ => IsSettingsOpen = true);
         OpenGameCommand = new RelayCommand(p => OpenGame((GameEntry)p!));
-        LocateExeCommand = new RelayCommand(p => LocateExe((GameEntry)p!));
-        ClearExeCommand = new RelayCommand(p => ClearExe((GameEntry)p!));
+        OpenFolderCommand = new RelayCommand(p => OpenFolder((GameEntry)p!));
+        FixSteamMatchCommand = new RelayCommand(p => FixSteamMatch((GameEntry)p!));
 
         // Startup update check: notify-only, never downloads. If a newer version
         // exists, the dot in the nav bar lights up and the user installs it from
@@ -56,8 +66,8 @@ public class MainViewModel : ObservableObject
     public RelayCommand RefreshCommand { get; }
     public RelayCommand OpenSettingsCommand { get; }
     public RelayCommand OpenGameCommand { get; }
-    public RelayCommand LocateExeCommand { get; }
-    public RelayCommand ClearExeCommand { get; }
+    public RelayCommand OpenFolderCommand { get; }
+    public RelayCommand FixSteamMatchCommand { get; }
 
     private bool _hasUpdateAvailable;
     /// <summary>True when the startup check found a newer version (not yet downloaded)
@@ -140,6 +150,23 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _statusText, value);
     }
 
+    private string _sortMode = "az";
+    /// <summary>Library sort mode: "az" (A–Z by title) or "recent" (newest folder
+    /// first). Persisted in settings.json on change.</summary>
+    public string SortMode
+    {
+        get => _sortMode;
+        set
+        {
+            if (SetProperty(ref _sortMode, value) && value is not null)
+            {
+                ApplySort();
+                _settings.SortMode = value;
+                SettingsStore.Save(_settings);
+            }
+        }
+    }
+
     private string _searchText = "";
     public string SearchText
     {
@@ -153,6 +180,22 @@ public class MainViewModel : ObservableObject
 
     public string GameCountText =>
         Games.Count == 0 ? "No games" : $"{Games.Count} game{(Games.Count == 1 ? "" : "s")}";
+
+    /// <summary>
+    /// Orders the tiles. Sections always stay in library-folder (settings) order —
+    /// the index sort pins that — and within each section the chosen mode applies.
+    /// </summary>
+    private void ApplySort()
+    {
+        var recent = _sortMode == "recent";
+        GamesView.SortDescriptions.Clear();
+        GamesView.SortDescriptions.Add(new SortDescription(
+            nameof(GameEntry.LibraryFolderIndex), ListSortDirection.Ascending));
+        GamesView.SortDescriptions.Add(new SortDescription(
+            recent ? nameof(GameEntry.FolderCreatedUtc) : nameof(GameEntry.CleanTitle),
+            recent ? ListSortDirection.Descending : ListSortDirection.Ascending));
+        GamesView.Refresh();
+    }
 
     private bool FilterGame(object obj)
     {
@@ -193,8 +236,9 @@ public class MainViewModel : ObservableObject
             var scanned = new List<GameEntry>();
             var errors = new List<string>();
 
-            foreach (var path in paths)
+            for (var i = 0; i < paths.Count; i++)
             {
+                var path = paths[i];
                 var result = await Task.Run(() => LibraryScanner.Scan(path));
                 if (result.Error != null)
                 {
@@ -208,7 +252,10 @@ public class MainViewModel : ObservableObject
                 if (string.IsNullOrEmpty(folderName))
                     folderName = path;
                 foreach (var game in result.Games)
+                {
                     game.LibraryFolderName = folderName;
+                    game.LibraryFolderIndex = i;
+                }
                 scanned.AddRange(result.Games);
             }
 
@@ -232,10 +279,6 @@ public class MainViewModel : ObservableObject
 
             foreach (var game in scanned)
             {
-                var installedExe = _installState.GetExePath(game.FolderName);
-                if (!string.IsNullOrEmpty(installedExe))
-                    game.InstalledExePath = installedExe;
-
                 // Restore persisted Steam details so re-scans don't lose them
                 // (and the detail page can open without a network round-trip).
                 var steam = _steamDetails.Get(game.FolderName);
@@ -272,35 +315,36 @@ public class MainViewModel : ObservableObject
         }
     }
 
-    // ---- install state / launching ----
+    // ---- launching ----
+
+    private void OpenFolder(GameEntry game)
+    {
+        try
+        {
+            Process.Start("explorer.exe", game.FolderPath);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Couldn't open the folder for {game.CleanTitle}: {ex.Message}";
+        }
+    }
+
+    private void FixSteamMatch(GameEntry game)
+    {
+        new SteamMatchWindow(game, _steamDetails)
+        {
+            Owner = Application.Current.MainWindow
+        }.ShowDialog();
+    }
 
     private void LaunchGame(GameEntry game)
     {
-        var outcome = GameLauncher.TryLaunch(game.FolderPath, game.InstalledExePath);
+        // Always run the repack's setup.exe — the app has no notion of "installed".
+        var outcome = GameLauncher.TryLaunch(game.FolderPath, null);
         if (outcome.Success)
-            StatusText = game.InstalledExePath == null
-                ? $"Running the installer for {game.CleanTitle}…"
-                : $"Launching {game.CleanTitle}…";
+            StatusText = $"Running the installer for {game.CleanTitle}…";
         else
             UiDialogs.Warn(outcome.Message);
-    }
-
-    private void LocateExe(GameEntry game)
-    {
-        var exePath = UiDialogs.ChooseExe($"Locate the installed game for: {game.CleanTitle}");
-        if (exePath == null)
-            return;
-
-        _installState.SetExePath(game.FolderName, exePath);
-        game.InstalledExePath = exePath;
-        StatusText = $"Marked {game.CleanTitle} as installed — its game page will now launch the game instead of the installer.";
-    }
-
-    private void ClearExe(GameEntry game)
-    {
-        _installState.ClearExePath(game.FolderName);
-        game.InstalledExePath = null;
-        StatusText = $"Cleared install state for {game.CleanTitle} — clicking its tile will run the installer again.";
     }
 
     private void OnSettingsSaved()

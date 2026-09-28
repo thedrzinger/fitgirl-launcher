@@ -12,17 +12,6 @@ public static class UiDialogs
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
-    public static string? ChooseExe(string title)
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = title,
-            Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
-            CheckFileExists = true
-        };
-        return dialog.ShowDialog() == true ? dialog.FileName : null;
-    }
-
     public static void Info(string message, string title = "FitGirl Launcher")
         => MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
 

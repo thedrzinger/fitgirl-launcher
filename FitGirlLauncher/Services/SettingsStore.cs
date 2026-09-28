@@ -14,6 +14,11 @@ public class AppSettings
     public List<string> LibraryPaths { get; set; } = new();
     public string SteamGridDbApiKey { get; set; } = "";
 
+    /// <summary>Library sort mode: "az" (title A–Z) or "recent" (newest folder
+    /// first). The dropdown in the library toolbar writes this; see
+    /// MainViewModel.ApplySort for how it's applied.</summary>
+    public string SortMode { get; set; } = "az";
+
     /// <summary>
     /// GitHub repo hosting the Velopack releases. Edit this in settings.json to
     /// point the app at another repo (e.g. a test channel) without a rebuild.
@@ -26,7 +31,7 @@ public class AppSettings
 
 /// <summary>
 /// Local persistence under %AppData%\FitGirlLauncher:
-/// settings.json, install-state.json, art-cache\, steam-details.json.
+/// settings.json, art-cache\, steam-details.json.
 /// </summary>
 public static class SettingsStore
 {
@@ -41,7 +46,6 @@ public static class SettingsStore
         "FitGirlLauncher");
 
     public static string SettingsFilePath => Path.Combine(AppDataDir, "settings.json");
-    public static string InstallStateFilePath => Path.Combine(AppDataDir, "install-state.json");
     public static string ArtCacheDir => Path.Combine(AppDataDir, "art-cache");
     public static string ArtIndexFilePath => Path.Combine(ArtCacheDir, "index.json");
     public static string SteamDetailFilePath => Path.Combine(AppDataDir, "steam-details.json");

@@ -68,14 +68,18 @@ public class GameDetailViewModel : ObservableObject
         LaunchCommand = new RelayCommand(_ => _launch(_game));
         RefreshCommand = new RelayCommand(_ => _ = FetchAsync());
         OpenScreenshotCommand = new RelayCommand(p => OpenScreenshot(p as ScreenshotItem));
+        FixSteamMatchCommand = new RelayCommand(_ =>
+        {
+            new SteamMatchWindow(_game, _steamStore)
+            {
+                Owner = Application.Current.MainWindow
+            }.ShowDialog();
+        });
 
         _game.PropertyChanged += (_, e) =>
         {
             switch (e.PropertyName)
             {
-                case nameof(GameEntry.InstalledExePath):
-                    OnPropertyChanged(nameof(LaunchText));
-                    break;
                 case nameof(GameEntry.ArtLoading):
                     OnPropertyChanged(nameof(ArtLoading));
                     break;
@@ -85,6 +89,20 @@ public class GameDetailViewModel : ObservableObject
                 case nameof(GameEntry.StoreName):
                 case nameof(GameEntry.SteamAppId):
                     OnPropertyChanged(nameof(StoreLine));
+                    break;
+                // A manual "Fix Steam match" swap changes these while the page is
+                // open. The fetch path manages the strip/banners itself, so skip
+                // it mid-fetch.
+                case nameof(GameEntry.ScreenshotUrls):
+                    if (!_fetchInFlight)
+                        _ = ReloadScreenshotsAsync();
+                    break;
+                case nameof(GameEntry.SteamLookupStatus):
+                    if (!_fetchInFlight)
+                    {
+                        ShowNotFound = _game.SteamLookupStatus == SteamLookupStatus.NotOnSteam;
+                        ShowFailed = _game.SteamLookupStatus == SteamLookupStatus.Failed;
+                    }
                     break;
             }
         };
@@ -104,7 +122,7 @@ public class GameDetailViewModel : ObservableObject
     public GameEntry Game => _game;
     public string Title => _game.CleanTitle;
     public bool ArtLoading => _game.ArtLoading;
-    public string LaunchText => _game.IsInstalled ? "Launch game" : "Run installer";
+    public string LaunchText => "Run installer";
 
     public string FetchedLine => _game.LastFetchedUtc > DateTime.MinValue
         ? $"Steam details fetched {new DateTime(_game.LastFetchedUtc.Ticks, DateTimeKind.Utc).ToLocalTime():MMM d, yyyy HH:mm}"
@@ -128,6 +146,7 @@ public class GameDetailViewModel : ObservableObject
     public RelayCommand LaunchCommand { get; }
     public RelayCommand RefreshCommand { get; }
     public RelayCommand OpenScreenshotCommand { get; }
+    public RelayCommand FixSteamMatchCommand { get; }
 
     public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
     public bool HasScreenshots => Screenshots.Count > 0;
@@ -206,6 +225,17 @@ public class GameDetailViewModel : ObservableObject
             _fetchInFlight = false;
             IsLoading = false;
         }
+    }
+
+    /// <summary>Rebuilds the screenshot strip from the game's current URLs — used when a
+    /// manual "Fix Steam match" swap changes them while the page is open
+    /// (LoadThumbnailsAsync only appends, so clear first).</summary>
+    private async Task ReloadScreenshotsAsync()
+    {
+        Screenshots.Clear();
+        OnPropertyChanged(nameof(HasScreenshots));
+        if (_game.SteamLookupStatus == SteamLookupStatus.Found)
+            await LoadThumbnailsAsync();
     }
 
     /// <summary>Adds all screenshots to the strip (as placeholders) and fills in thumbnails as they land.</summary>
